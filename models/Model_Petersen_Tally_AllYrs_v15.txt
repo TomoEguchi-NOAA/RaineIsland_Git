@@ -1,0 +1,120 @@
+model{
+  # simple binomial model for repeated Lincoln-Petersen
+  # abundance estimation - from Gazey and Staley 1986
+  # and adding nesting success model to it with sharing N,
+  # and tally count
+  
+  # Petersen data - multiple sampling within a season and 
+  # the model is fit each year separately
+  
+  # n: Total number of painted turtles
+  # mt: the number of painted turtles seen at time t
+  # Ct: the total number of turtles seen at time t
+  
+  # we estimate p = n/N, which is the binomial p, then
+  # compute N from n/phat
+  
+  # Tally - nesting success data
+  # for v.8, I ignore renesting intervals and trying to incorporate
+  # those that return night after night - here, simply nesting success
+  # is used as the probability of a turtle coming to the shore
+  
+  # for v.9, the detection function is just a constant. results of v.8
+  # showed q_beta1, 2, and 3 were pretty much zeros
+  
+  # for v.10 nesting success is added - observed nesting success is
+  # coming from a year-specific beta distribution. 
+
+  # for v.11 proportion of females is included. 
+  
+  # for v.12 nesting success now has time-independent hyper priors s_alpha[.]
+  # and s_beta[.]. Emergence probability is a function of nesting success (s[t])
+  # in a inverse-logit with second order polynomial. Also simplified nesting
+  # success by removing the number of sections observed - simply binomial
+  # with the  number of females and number of clutches. 
+
+  # for v.13 
+  # s: Emergence probability (q[t]) is a function of nesting success (s[t])
+  # in a inverse-logit with a linear function. 
+
+  # for v.14, q (emergence probability) is time independent. It is defined
+  # as a functin of nesting success probability using the posterior
+  # of hyperparameters of s. No male is considered in this version. 
+
+  # for v15, q is time dependent with s[t] - but the same linear function
+  # as for v14.
+
+  # s: nesting success
+
+  # priors for Tally-nesting success - precision
+  tau_q ~ dgamma(1.5, 0.01)
+  q_se <- 1/sqrt(tau_q)
+
+  # non-vague prior to help convergence. 
+  # peaks at 50, mean is 150. 
+  TC_tau ~ dgamma(1.5, 0.01)
+  TC_se <- 1/sqrt(TC_tau)
+
+  # prior for the probability of females coming to nest
+  q_beta0 ~ dnorm(0, 0.1)
+  q_beta1 ~ dnorm(0, 0.1)
+  
+  # prior for nest success
+  s_alpha ~ dunif(1, 50)
+  s_beta ~ dunif(1, 50)
+
+  # exp(11.6) = 109098
+  # exp(12.0) = 162755
+
+  # probability of a turtle coming to nest should be a function
+  # of nesting success. Higher nesting success means lower
+  # emergence. Years with low nesting success means they keep coming
+  # back in consecutive days - higher emergence probability (q).
+
+  q_e ~ dnorm(0, tau_q)
+
+  for (t in 1:T){
+    # priors for season specific parameters
+    N[t] ~ dunif(Nmin[t], 200000)
+    
+    # Petersen part
+    for (i in 1:nt[t]){
+      # capture probability
+      p[t, i] <- M[t, i]/N[t]
+      # likelihood:
+      m[t, i] ~ dbin(p[t, i], n[t, i])
+    }
+
+    # Nesting success part
+     
+    # the observed number of turtles is binomial with the total number
+    # of females available with the probability of a female coming to nest q.
+    # This is all females that emerge to the beach - should equal to tally
+    # counts if no error. 
+
+    F_island[t] ~ dbin(q[t], round(N[t]))
+    s[t] ~ dbeta(s_alpha, s_beta) 
+    q[t] <- ilogit(q_beta0 + q_beta1 *(s[t]) + q_e)
+  
+    for (i in 1:n_dates[t]){ # days
+      
+      clutches[t, i] ~ dbin(s[t], TURT[t,i])  
+    }
+      
+    # Tally count data:
+    # Tally_true is observed with some error on tally count
+    # days. Use lognormal to avoid going into negative. Assumed constant
+    # sampling errors over time. This may be changed to be affected
+    # by the number available - more turtles means more error. 
+  
+    logF_island[t] <- log(F_island[t])
+    for (j in 1:TC_n[t]){      
+      
+      # log of Tally count is assumed log-normal distributed with a common
+      # variance term:
+      TC[t, j] ~ dlnorm(logF_island[t], TC_tau)
+    }
+    
+  }
+  
+}

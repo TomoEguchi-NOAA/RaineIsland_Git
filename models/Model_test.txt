@@ -1,0 +1,14 @@
+
+model{
+
+  beta1_p_TURT ~ dnorm(0, 0.1)
+  #TURT_true ~ dunif(250, 500)
+  meanN ~ dunif(250, 500)
+
+  for (i in 1:ndays){ # days
+    p_TURT[i] <- ilogit(beta1_p_TURT * n_sectors[i])
+    TURT[i] ~ dbin(p_TURT[i], TURT_true)
+	}
+
+	TURT_true ~ dpois(meanN)
+}

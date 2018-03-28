@@ -1,0 +1,40 @@
+model{
+  # Modeling remigration intervals with just tag and return data
+  # 
+  
+  # data
+  # nt: number of tags deployed per year; a vector
+  # mt: the number of recaptured turtles; a matrix of r x c where rows (r)
+  #     are years since tagging and columns (c) are different years. c should
+  #     equal to the length of nt
+  # phi: assumed survival rate of females - assume it is a constant.
+  
+  # assumes no tag loss
+  
+  # priors
+  # first assume the remigration intervals to be Poisson
+  # this may be time dependent so mu becomes a vector
+  mu ~ dunif(2, 20)
+  p ~ dbeta(1, 1)   # this is "capture probability"
+
+  # or use gamma?
+  #alpha_r ~ dunif(0.1, 100) 
+  #beta_r ~ dunif(0.1, 100)
+
+  for (i in 1:length(nt)){
+    #dat <- mt[, i]   # one year at a time
+    for (t in 1:20){
+      # likelihood needs to be defined here... 
+      # something like... remigration interval * some data... 
+      
+      
+      mt[t,i] ~ dpoi(mu) * (nt[i] * phi^t) * p
+      
+      
+    }
+
+  }
+  
+
+
+}

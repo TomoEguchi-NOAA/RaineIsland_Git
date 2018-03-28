@@ -1,0 +1,41 @@
+model{
+  # simple binomial model for repeated Lincoln-Petersen
+  # abundance estimation - from Gazey and Staley 1986
+  
+  # data
+  # M: Total number of painted turtles
+  # m: the number of painted turtles seen at time t
+  # n: the total number of turtles seen at time t
+  
+  # we estimate p = M/N, which is the binomial p
+  
+  # priors
+
+  N[1] ~ dunif(10000, 200000)
+
+  # prior for AR parameter
+  alpha_1 ~ dnorm(0, 0.001)
+  N_e ~ dnorm(0, tau_N)
+  
+  # error term for abundance:
+  tau_N ~ dgamma(1.5, 0.01)
+  N_se <- 1/sqrt(tau_N)
+
+  p[1,1] <- M[1,1]/N[1]
+  m[1,1] ~ dbin(p[1,1], n[1,1])
+
+  for (t in 2:T){
+   # AR(1) process for abundance  
+    N[t] <- alpha_1 * N[t-1] + N_e
+    
+    # Petersen part
+    for (i in 1:nt[t]){
+      p[t, i] <- zero[t,i] * M[t, i]/N[t]
+
+      # likelihood:
+      m[t, i] ~ dbin(p[t, i], n[t, i])
+      zero[t,i] ~ dinterval(M[t, i]/N[t], 1)
+    }
+  }
+
+}

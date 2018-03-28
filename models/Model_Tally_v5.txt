@@ -1,0 +1,58 @@
+model{
+  # nesting success model to it with sharing N
+  
+  # Tally - nesting success data
+  # R: Fixed internesting period
+  # y: Tally counts
+  # s: nesting success
+
+  # priors for Tally-nesting success
+  alpha_s ~ dunif(0.1, 10)
+  beta_s ~ dunif(0.1, 10)
+  q ~ dbeta(1, 1)
+  
+  # priors for season specific parameters
+  for (t in 1:T){
+    N[t] ~ dunif(Nmin[t], 100000)
+    r[t] ~ dbeta(1, 1)
+    #TCtau[t] ~ dgamma(0.1, 0.001)
+    #eps[t] ~ dnorm(0, eps_tau)
+  }
+  
+  for (t in 1:T){
+    # Tally and nesting success part
+
+    # nesting success modeled as a function of 
+    # total abundance (OR Nmin...); none seemed to work
+    # so, now have a hyperdistribution. 
+    #logit(s[t]) <- b0 + b1 * log(Nmin[t]) + eps[t]
+    s[t] ~ dbeta(alpha_s, beta_s)
+    
+    a[t] <- 1 - s[t]
+    s_dt[t] <- 1 + a[t] + a[t]^2 + a[t]^3 + a[t]^4 + a[t]^5 + a[t]^6 + a[t]^7 + a[t]^8 + a[t]^9 + a[t]^10 + a[t]^11 + a[t]^12
+
+    # nest counts are binomial here
+    nest[t] ~ dbin(s[t], TURT[t])
+    # turtles coming up in observed sections to nest is 
+    # Poisson with 
+    # a proportion q and the abundance... 
+    # does it really make sense?
+    TURT[t] ~ dpois(q * N[t])
+    
+    # expected number of turtles on a beach on survey days  
+    TCmu[t] <- (N[t]/R) * s_dt[t]
+      
+    for (j in 1:yt[t]){
+      
+      # true number of females on survey days
+      TC_true[t, j] ~ dpois(TCmu[t])
+      
+      # then those get observed with observation r
+      y[t, j] ~ dbin(r[t], TC_true[t, j])
+      
+    }
+    #TCsd[t] <- sqrt(1/TCtau[t])
+  }
+
+
+}

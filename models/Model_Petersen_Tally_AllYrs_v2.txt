@@ -1,0 +1,81 @@
+model{
+  # Don't run this one... TURT variable doesn't make sense
+
+  # simple binomial model for repeated Lincoln-Petersen
+  # abundance estimation - from Gazey and Staley 1986
+  # and adding nesting success model to it with sharing N
+  
+  # Petersen data - multiple sampling within a season and 
+  # the model is fit each year separately
+  
+  # n: Total number of painted turtles
+  # mt: the number of painted turtles seen at time t
+  # Ct: the total number of turtles seen at time t
+  
+  # we estimate p = n/N, which is the binomial p, then
+  # compute N from n/phat
+  
+  # Tally - nesting success data
+  # R: Fixed internesting period
+  # y: Tally counts
+  # s: nesting success
+
+  # Combine all years to fill in missing data
+
+  # priors for Tally-nesting success
+  alpha_s ~ dunif(0.1, 10)
+  beta_s ~ dunif(0.1, 10)
+  #b0 ~ dnorm(0, 0.1)
+  #b1 ~ dnorm(0, 1)
+  #b2 ~ dnorm(0, 0.1)
+  #eps_tau ~ dgamma(2,3)
+  #q ~ dbeta(1, 1)
+  
+  #eps_tau   3.596e-01 3.140e-01
+  # a<-0.4^2/(0.3^2)
+  # b <- a * (1 - 0.4)/0.4
+  
+  # priors for season specific parameters
+  for (t in 1:T){
+    N[t] ~ dunif(Nmin[t], 100000)
+    TCtau[t] ~ dgamma(0.1, 0.001)
+    #eps[t] ~ dnorm(0, eps_tau)
+  }
+  
+  for (t in 1:T){
+    # Petersen part
+    for (i in 1:nt[t]){
+    
+      p[t, i] <- n[t, i]/N[t]
+      # likelihood:
+      M[t, i] ~ dbin(p[t, i], C[t, i])
+    
+    }
+
+    # Tally and nesting success part
+
+    # nesting success modeled as a function of 
+    # total abundance (OR Nmin...); none seemed to work
+    # so, now have a hyperdistribution. 
+    #logit(s[t]) <- b0 + b1 * log(Nmin[t]) + eps[t]
+    s[t] ~ dbeta(alpha_s, beta_s)
+    
+    a[t] <- 1 - s[t]
+    s_dt[t] <- 1 + a[t] + a[t]^2 + a[t]^3 + a[t]^4 + a[t]^5 + a[t]^6 + a[t]^7 + a[t]^8 + a[t]^9 + a[t]^10 + a[t]^11 + a[t]^12
+      
+    for (j in 1:yt[t]){
+      # or... the expected number of turtle coming up to 
+      # shore is N * (1/12), the average days between nesting
+      TURT[t, j] ~ dpois(N[t]/R)
+      
+      # nest counts are binomial here
+      nest[t, j] ~ dbin(s[t], TURT[t, j])
+      
+      TCmu[t, j] <- (N[t]/R) * s_dt[t]
+      y[t, j] ~ dnorm(TCmu[t, j], TCtau[t])
+      
+    }
+    TCsd[t] <- sqrt(1/TCtau[t])
+  }
+  
+}

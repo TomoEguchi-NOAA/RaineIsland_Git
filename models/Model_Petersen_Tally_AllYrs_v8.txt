@@ -1,0 +1,110 @@
+model{
+  # simple binomial model for repeated Lincoln-Petersen
+  # abundance estimation - from Gazey and Staley 1986
+  # and adding nesting success model to it with sharing N,
+  # and tally count
+  
+  # Petersen data - multiple sampling within a season and 
+  # the model is fit each year separately
+  
+  # n: Total number of painted turtles
+  # mt: the number of painted turtles seen at time t
+  # Ct: the total number of turtles seen at time t
+  
+  # we estimate p = n/N, which is the binomial p, then
+  # compute N from n/phat
+  
+  # Tally - nesting success data
+  # for v.8, I ignore renesting intervals and trying to incorporate
+  # those that return night after night - here, simply nesting success
+  # is used as the probability of a turtle coming to the shore
+  # s: nesting success
+
+  # priors for Tally-nesting success
+  s_alpha ~ dunif(1, 10)
+  s_beta ~ dunif(1, 10)
+
+  #r_alpha ~ dunif(1, 10)
+  #r_beta ~ dunif(1, 10)
+  
+  q_tau ~ dgamma(0.01, 0.01)
+  
+  # prior for the detection interecept and slope
+  q_beta0 ~ dnorm(0, 0.1)
+  q_beta1 ~ dnorm(0, 0.1)
+  q_beta2 ~ dnorm(0, 0.1)
+  q_beta3 ~ dnorm(0, 0.1)
+
+  #r ~ dbeta(r_alpha, r_beta)
+  TC_tau ~ dgamma(0.1, 0.1)
+
+  # prior for the slope of detection wrt # sampled sectors
+  TURT_p_beta1 ~ dnorm(0, 0.1)
+
+  # priors for the shape parameters for TURT and TC
+  # these are different because TC is always greater
+  # than TURT
+  
+  # priors for season specific parameters
+  # exp(11.6) = 109098
+  # exp(12.0) = 162755
+  for (t in 1:T){
+    logN[t] ~ dunif(logNmin[t], 11.6)
+
+    # for Tally counts
+    #for (j in 1:TC_n[t]){
+    #r[t] ~ dbeta(r_alpha, r_beta)
+    #}
+  }
+  
+  for (t in 1:T){
+    N[t] <- exp(logN[t])
+    # Petersen part
+    for (i in 1:nt[t]){
+      # capture probability
+      p[t, i] <- n[t, i]/exp(logN[t])
+      # likelihood:
+      M[t, i] ~ dbin(p[t, i], C[t, i])
+    }
+
+    # Tally and nesting success part
+    # s[t] is the nesting success probability
+    # assume that the mean probability of turtles coming to the shore is affected
+    # by s[t] in a non-linear manner - here I tried a third-order polynomial
+    # with an error then inv-logit to make it a probability
+    s[t] ~ dbeta(s_alpha, s_beta)   
+    q_mean[t] ~ dnorm(q_beta0 + q_beta1*s[t] + q_beta2*(s[t])^2 + q_beta3*(s[t])^3, q_tau)
+    q[t] <- ilogit(q_mean[t])
+
+    # probability of observing N TURT is 
+    # affected linearly by the number of sectors observed
+    # The mean number of turtles available for obsevation per
+    # night is TURT_true - this is recorded in tally counts
+    # the number of observed clutches is a function of how many
+    # nesters were observed TURT and nesting success s[t]
+    TURT_true[t] ~ dbin(q[t], round(exp(logN[t])))
+    for (i in 1:n_dates[t]){ # days
+      
+      p_TURT[t, i] <- ilogit(TURT_p_beta1 * n_sectors[t, i])      
+      TURT[t, i] ~ dbin(p_TURT[t, i], TURT_true[t])
+      
+      clutches[t, i] ~ dbin(s[t], TURT[t,i])
+    }
+      
+    # Tally count data:
+    # TURT_true is observed with some error on tally count
+    # days. Use log to avoid going into negative. Assumed constant
+    # sampling errors over time. This may be changed to be affected
+    # by the number available - more turtles means more error. 
+    logTURT_true[t] <- log(TURT_true[t])
+    for (j in 1:TC_n[t]){      
+      
+      # then those get observed with observation r
+      #TC[t, j] ~ dbin(r, TURT_true[t])
+      #TC[t, j] ~ dpois(r * TURT_true[t])
+      logTC[t, j] ~ dlnorm(logTURT_true[t], TC_tau)
+    }
+    
+  }
+  
+}

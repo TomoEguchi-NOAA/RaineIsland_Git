@@ -1,0 +1,26 @@
+model{
+  # nesting success model to it with sharing N
+  
+  # Tally - nesting success data
+  # T: Fixed internesting period
+  # TC: Tally counts
+  # s: nesting success
+  # cumulative sum of time steps
+  
+  # priors for N; minimum is defined in the R code
+  N ~ dunif(Nmin, 100000)
+  
+  # priors for Tally-nesting success
+  TCtau ~ dgamma(0.01, 0.01)
+  
+  const <- s/T
+  
+  for (j in 1:length(y)){
+    
+    y[j] ~ dnorm(TCmu[j], TCtau)
+    
+    TCmu[j] <- const * N * s_dt[j]
+    
+  }
+
+}

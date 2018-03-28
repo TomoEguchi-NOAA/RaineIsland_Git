@@ -1,0 +1,44 @@
+model{
+  # simple binomial model for repeated Lincoln-Petersen
+  # abundance estimation - from Gazey and Staley 1986
+  # and adding nesting success model to it with sharing N
+  
+  # Petersen data - multiple sampling within a season and 
+  # the model is fit each year separately
+  
+  # n: Total number of painted turtles
+  # mt: the number of painted turtles seen at time t
+  # Ct: the total number of turtles seen at time t
+  
+  # we estimate p = n/N, which is the binomial p, then
+  # compute N from n/phat
+  
+  # Tally - nesting success data
+  # T: Fixed internesting period
+  # TC: Tally counts
+  # s: nesting success
+  
+  # priors for Petersen
+  N ~ dunif(Nmin, 100000)
+  
+  for (i in 1:length(n)){
+    p[i] <- n[i]/N
+    # likelihood:
+    M[i] ~ dbin(p[i], C[i])
+    
+  }
+  
+  # priors for Tally-nesting success
+  TCtau ~ dgamma(0.01, 0.01)
+  
+  const <- s/T
+  
+  for (j in 1:length(y)){
+    
+    y[j] ~ dnorm(TCmu[j], TCtau)
+    
+    TCmu[j] <- const * N * s_dt[j]
+    
+  }
+
+}

@@ -1,0 +1,122 @@
+model{
+  # simple binomial model for repeated Lincoln-Petersen
+  # abundance estimation - from Gazey and Staley 1986
+  # and adding nesting success model to it with sharing N
+  # and tally count, all of which are on top of the 
+  # state space of unknown abundance of females, which is 
+  # modeled as an AR(1) process with a trend.
+  
+  # Petersen data - multiple sampling within a season and 
+  # the model is fit each year separately
+  
+  # n: Total number of painted turtles
+  # mt: the number of painted turtles seen at time t
+  # Ct: the total number of turtles seen at time t
+  
+  # we estimate p = n/N, which is the binomial p, then
+  # compute N from n/phat
+  
+  # Tally - nesting success data
+  # y: Tally counts
+  # s: nesting success
+
+  # prior for the detection logit model slope
+  beta1_p_TURT ~ dnorm(0, 0.1)
+  
+  # priors for auto regressive terms:
+  # these are from: 
+  # http://doingbayesiandataanalysis.blogspot.co.uk/2012/10/bayesian-estimation-of-trend-with-auto.html
+  ar1 ~ dunif(-1.1, 1.1)
+  beta0_trend ~ dnorm(0, 0.001)
+  beta1_trend ~ dnorm(0, 0.001)
+  N_tau ~ dgamma(0.001, 0.001)
+  N_nu <- nuMinusOne + 1
+  nuMinusOne ~ dexp(1/29)
+  
+  # priors for season specific parameters
+  for (t in 1:T){
+    #N[t] ~ dunif(Nmin[t], 100000)
+    #TCtau[t] ~ dgamma(0.1, 0.001)
+    r[t] ~ dbeta(1, 1)
+  }
+  
+  # for this version (v.7), repeated measures of TURT and nest
+  # counts are modeled. Note that there are
+  # different sectors also, so different 'effort' per day. 
+  # Sighting probability is time-independent but effort dependent (p.TURT)
+    
+  # the nunmber of available turtles is a function of nesting success (s),
+  # which 'piles up' those that didn't nest one night, average number of days
+  # between nesting within a season (RENesting INTerval), and how long they 
+  # keep coming back until abort eggs (maxR). 
+
+  # set up the state-space part here. Nmu is the unobserved process
+  N1_mu ~ dunif(11565, 100000)  
+  N[1] <- N1_mu
+  N_mu[1] <- N[1] 
+  trend[1] <- beta0_trend + beta1_trend * centered_time[1]
+  for (t in 2:T){
+  
+    # # females is AR process with a trend and observed N is 
+    # distributed with t distribution, allowing outliers.
+    N[t] ~ dt( N_mu[t], N_tau, N_nu)
+    N_mu[t] <- trend[t] + ar1 * (N[t-1] - trend[t-1])
+    
+    trend[t] <- beta0_trend + beta1_trend * centered_time[t]
+  
+    # Petersen part
+    for (i in 1:nt[t]){
+      # capture probability
+      p[t, i] <- n[t, i]/N[t]
+      # likelihood:
+      M[t, i] ~ dbin(p[t, i], C[t, i])
+    }
+
+    # Tally and nesting success part
+
+    # nesting success modeled as the number observed and 
+    # the number nested:
+    s[t] ~ dbeta(1,1)   # prior for s[t]
+
+    # The expected number of turtles coming up to nest per night (assuming
+    # the total number N is constant for the time period considered):
+    s_11[t,1] <- 1
+    #J <- maxR+1
+    for (j in 2:(maxR+1)){
+      s_11[t,j] <- s_11[t,j-1] + (1 - s[t])^j
+    }
+    s_1[t] <- s_11[t,(maxR+1)]
+  
+    # Number of nesters expected to come up to nest per night over 
+    # the entire island:
+    # (N/REN_INT) * s_1
+    # n_dates[t] # of sampling dates for year t
+    # n_sectors[t, j]  # sampled sectors of year t, day j
+    
+    # probability of observing N turtles is binomial with probability
+    # affected linearly by the number of sectors observed
+    for (i in 1:n_dates[t]){ # days
+      p_TURT[t, i] <- ilogit(beta1_p_TURT * n_sectors[t, i])
+      TURT[t, i] ~ dbin(p_TURT[t, i], TURT_true[t])
+      clutches[t, i] ~ dbin(s[t], TURT[t, i])
+    }
+      
+    # expected number of turtles on a beach on survey days  
+    TURTmu[t] <- s_1[t] * N[t]/REN_INT #(N[t]/R[t]) * s_dt[t]
+    TURT_true[t] ~ dpois(TURTmu[t])
+      
+    # Tally count data:
+    for (j in 1:TC_n[t]){
+      
+      # true number of females on a tally count survey day
+      # which is the same as TURT count
+      TC_true[t, j] ~ dpois(TURTmu[t])
+      
+      # then those get observed with observation r
+      TC[t, j] ~ dbin(r[t], TC_true[t, j])
+      
+    }
+    
+  }
+  
+}

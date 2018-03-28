@@ -1,0 +1,65 @@
+model{
+
+  # Tally - nesting success data
+  
+  #v9: probability of turtles coming to shore (q) is inv-logit of a linear
+  # function of (s[t]) and the number observed is binomial rather than
+  # log normal. Does not converge. 
+
+  # s[t]: nesting success
+
+  tau_q ~ dgamma(1.5, 0.01)
+  q_se <- 1/sqrt(tau_q)
+
+  TC_p ~ dbeta(1, 1)
+
+  # prior for the probability of females coming to nest
+  q_beta0 ~ dnorm(0, 0.1)
+  q_beta1 ~ dnorm(0, 0.1)
+
+  # prior for nest success
+  s_alpha ~ dunif(1, 50)
+  s_beta ~ dunif(1, 50)
+
+  # probability of a turtle coming to nest should be a function
+  # of nesting success. Higher nesting success means lower
+  # emergence. Years with low nesting success means they keep coming
+  # back in consecutive days - higher emergence probability (q).
+  # q is bound by 1/R and 1.0, R = the number of days between successful laying
+
+  q_e ~ dnorm(0, tau_q)
+
+  for (t in 1:T){
+    # priors for season specific parameters
+    N[t] ~ dunif(Nmin[t], 200000)
+    # the observed number of turtles is binomial with the total number
+    # of females available with the probability of a female coming to nest q[t]
+    # This is all females that emerge to the beach - should equal to tally
+    # counts if no error. 
+    F_island[t] ~ dbin(q[t], round(N[t]))
+
+    # s[t] is the nesting success probability
+    s[t] ~ dbeta(s_alpha, s_beta) 
+    q[t] <- ilogit(q_beta0 + q_beta1 *(s[t]) + q_e)
+  
+    for (i in 1:n_dates[t]){ # days
+      
+      clutches[t, i] ~ dbin(s[t], TURT[t,i])  
+    }
+      
+    # Tally count data:
+    # Tally_true is observed with some error on tally count
+    # days. Use lognormal to avoid going into negative. Assumed constant
+    # sampling errors over time. This may be changed to be affected
+    # by the number available - more turtles means more error. 
+  
+    for (j in 1:TC_n[t]){      
+      
+      # log of Tally count is assumed log-normal distributed with a common
+      # variance term:
+      TC[t, j] ~ dbin(TC_p, F_island[t])
+    }
+    
+  }
+  
+}

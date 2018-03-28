@@ -1,0 +1,129 @@
+model{
+  # simple binomial model for repeated Lincoln-Petersen
+  # abundance estimation - from Gazey and Staley 1986
+  # and adding nesting success model to it with sharing N,
+  # and tally count
+  
+  # Petersen data - multiple sampling within a season and 
+  # the model is fit each year separately
+  
+  # n: Total number of painted turtles
+  # mt: the number of painted turtles seen at time t
+  # Ct: the total number of turtles seen at time t
+  
+  # we estimate p = n/N, which is the binomial p, then
+  # compute N from n/phat
+  
+  # Tally - nesting success data
+  # y: Tally counts
+  # s: nesting success
+
+  # priors for Tally-nesting success - unused
+  #alpha_s ~ dunif(0.1, 10)
+  #beta_s ~ dunif(0.1, 10)
+  #q ~ dbeta(1, 1)
+  
+  # prior for the detection interecept and slope
+  TURT_beta0 ~ dnorm(0, 0.1)
+  TURT_beta1 ~ dnorm(0, 0.1)
+  
+  # prior for the slope of detection wrt # sampled sectors
+  TURT_p_beta1 ~ dnorm(0, 0.1)
+
+  # Prior for the scale parameter for TURT and TC data
+  # these are shared by the two:
+  TURT_TC_alpha ~ dunif(1, 10)
+
+  # priors for the shape parameters for TURT and TC
+  # these are different because TC is always greater
+  # than TURT
+  
+  # priors for season specific parameters
+  # exp(11.6) = 109098
+  # exp(12.0) = 162755
+  for (t in 1:T){
+    logN[t] ~ dunif(logNmin[t], 11.6)
+    #TURT_beta[t] ~ dunif(0, 10)
+    #TC_beta[t] ~ dunif(0, 10)
+
+    # nesting success modeled as the number observed and 
+    # the number nested:
+    s[t] ~ dbeta(1,1)   # prior for s[t]
+    
+    for (j in 1:TC_n[t]){
+      r[t,j] ~ dbeta(1, 1)
+    }
+  }
+  
+  # for this version (v.7), repeated measures of TURT and nest
+  # counts are modeled. Note that there are
+  # different sectors also, so different 'effort' per day. 
+  # Sighting probability is time-independent but effort dependent (p.TURT)
+    
+  # the nunmber of available turtles is a function of nesting success (s),
+  # which 'piles up' those that didn't nest one night, average number of days
+  # between nesting within a season (RENesting INTerval), and how long they 
+  # keep coming back until abort eggs (maxR). 
+    
+  
+  for (t in 1:T){
+    N[t] <- exp(logN[t])
+    # Petersen part
+    for (i in 1:nt[t]){
+      # capture probability
+      p[t, i] <- n[t, i]/exp(logN[t])
+      # likelihood:
+      M[t, i] ~ dbin(p[t, i], C[t, i])
+    }
+
+    # Tally and nesting success part
+
+   
+
+    # The expected number of turtles coming up to nest per night (assuming
+    # the total number N is constant for the time period considered):
+    s_11[t,1] <- 1
+    #J <- maxR+1
+    for (j in 2:(maxR+1)){
+      s_11[t,j] <- s_11[t,j-1] + (1 - s[t])^j
+    }
+    s_1[t] <- s_11[t,(maxR+1)]
+  
+    # Number of nesters expected to come up to nest per night over 
+    # the entire island:
+    # (N/REN_INT) * s_1
+    # n_dates[t] # of sampling dates for year t
+    # n_sectors[t, j]  # sampled sectors of year t, day j
+    
+    # expected number of turtles on a beach on survey days  
+    TURT_mu[t] <-s_1[t] * exp(logN[t])/REN_INT
+    
+    # probability of observing N TURT is 
+    # affected linearly by the number of sectors observed
+    for (i in 1:n_dates[t]){ # days
+      p_TURT[t, i] <- ilogit(TURT_p_beta1 * n_sectors[t, i])
+      TURT_beta[t, i] <- p_TURT[t,i] * TURT_mu[t]/TURT_TC_alpha
+      TURT_true[t, i] ~ dgamma(TURT_TC_alpha, TURT_beta[t])
+      
+      TURT[t, i] ~ dbin(p_TURT[t, i], round(TURT_true[t, i]))
+      
+      clutches[t, i] ~ dbin(s[t], round(TURT_true[t, i]))
+    }
+      
+    TC_beta[t] <- TURT_mu[t]/TURT_TC_alpha         
+    # Tally count data:
+    for (j in 1:TC_n[t]){
+      
+      # true number of females on a tally count survey day,
+      # which is the same as the underlying abundance from which
+      # TURT is observed, which is only at one or two beach sections
+      #TC_true[t, j] ~ dpois(TURT_mu[t])
+      TC_true[t, j] ~ dgamma(TURT_TC_alpha, TC_beta[t])
+      # then those get observed with observation r
+      TC[t, j] ~ dbin(r[t, j], round(TC_true[t, j]))
+      
+    }
+    
+  }
+  
+}

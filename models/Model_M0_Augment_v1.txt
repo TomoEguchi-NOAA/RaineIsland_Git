@@ -1,0 +1,30 @@
+# Closed model 1 from Kery and Schaub 2012. p. 142
+ # M0
+
+# Omega = 'inclusion' probability; the probability with which
+# a member of the augmented individuals is included in the population
+# of size N
+
+# data
+# M: Total number of painted turtles
+# m: the number of painted turtles seen at time t
+# n: the total number of turtles seen at time t
+model{
+#  for (t in 1:T){
+    # priors
+    Omega ~ dunif(0, 1)
+    p ~ dunif(0, 1)
+
+    # likelihood
+    # M[t] is the total augemented individuals (including the ones that were seen)
+    for (i in 1:M){   
+      z[i] ~ dbern(Omega)  # inclusion probability
+      for (j in 1:2){    # two sample capture-recapture
+        yaug[i, j] ~ dbern(p.eff[i, j])
+        p.eff[i, j] <- z[i] * p
+      }
+    }
+    N <- sum(z[])
+  }
+#}
+  
