@@ -1,0 +1,183 @@
+---
+title: "Trend analysis"
+output:
+  html_document:
+    df_print: paged
+---
+
+This analysis conducts regression analyses on posterior samples of abundance from the integrated approach. Although it is best to have the trend analysis included in the integrated analysis, I can't figure it out right now - as of Jan 2018. The problem is that the posteriors are wide and time-series steps put abundance into negative numbers. So, the likelihood needs to be changed to log-normal or something but then the entire model needs to be rewritten. So, for now, I compute posteriors for each year independently then fit GAM and GLM for "trend". It may be beneficial so as to find non-linear abundance change over the 40-year period. 
+
+First bring in the results from the most recent analysis:
+
+```{r}
+#first clear the work space
+rm(list=ls())
+source('RaineIsl_functions.R')
+library(mgcv)
+library(rjags)
+
+# input data files 
+petersen.file <- 'data/Petersen_data.csv'
+nest.file <- 'data/nesting_success.csv'
+tally.file <- 'data/Tally.csv'
+
+load('RData/jags_out_Integrated_v15_2018-01-25_P.RData')
+
+tally.list.3 <- get.tally.data.v3(nestfile = nest.file,
+                                  tallyfile = tally.file)
+
+nest.suc.df <- na.omit(data.frame(season = tally.list.3$nest.raw$SEASON,
+                                  NSUC1 = tally.list.3$nest.raw$NSUC1))
+
+params2seasons.N <- data.frame(parameter = c("N[1]", "N[2]", "N[3]", "N[4]", 
+                                             "N[5]", "N[6]", "N[7]", "N[8]", "N[9]", 
+                                             "N[10]", "N[11]", "N[12]", "N[13]", 
+                                             "N[14]", "N[15]", "N[16]", "N[17]", 
+                                             "N[18]", "N[19]", "N[20]", "N[21]", 
+                                             "N[22]", "N[23]", "N[24]", "N[25]", 
+                                             "N[26]", "N[27]", "N[28]", "N[29]", 
+                                             "N[30]", "N[31]", "N[32]", "N[33]", 
+                                             "N[34]", "N[35]", "N[36]", "N[37]", 
+                                             "N[38]", "N[39]", "N[40]"),
+                               season = tally.list.3$uniq.yrs)
+
+# tmp.I contains all posterior samples
+df.integrated <- do.call(rbind.data.frame, tmp.I)
+# extract the abundance estimates:
+uniq.yrs <- tally.list.3$uniq.yrs
+seq.1 <- seq(from = 1, 
+             to = length(uniq.yrs))
+N.names <- paste0('N[', seq.1, ']')
+
+n.samples <- 1000
+
+# select random samples without replacement:
+df.N.integrated <- sample_n(df.integrated, size = n.samples) %>%
+  select(., starts_with('N')) %>%
+  change.parameter.name(., params2seasons.N) 
+#  gather(1974:1984, factor_key = TRUE) 
+
+#colnames(df.N.integrated) <- c("season", "sample") 
+
+```
+
+Now repeat a regression analysis n.samples times. Then see linear and GAM fits through a set of posterior samples.
+
+```{r}
+years <- as.numeric(colnames(df.N.integrated))
+#breaks <- 1990:2006
+
+lm.list <- gam.list <- vector(mode = 'list', length = n.samples)
+lm.logN.list <- gam.logN.list <- vector(mode = 'list', length = n.samples)
+
+for (k in 1:n.samples){
+  tmp.df <- data.frame(time = years,
+                       N = as.vector(df.N.integrated[k,], 
+                                     mode = 'numeric'))
+  lm.list[[k]] <- lm(N ~ time, data = tmp.df)
+  # using spline as the smooth function and liims the dimension to 3
+  # to avoid spurious fitting:
+  gam.list[[k]] <- gam(N ~ s(time, k = 3), data = tmp.df)
+  lm.logN.list[[k]] <- lm(log(N) ~ time, data = tmp.df)
+  # using spline as the smooth function and liims the dimension to 3
+  # to avoid spurious fitting:
+  gam.logN.list[[k]] <- gam(log(N) ~ s(time, k = 3), data = tmp.df)
+}
+
+plot.set <- rdunif(n=1, a=1, b=n.samples)
+tmp.N.df <- data.frame(time = years,
+                       N = as.vector(df.N.integrated[plot.set,], 
+                                     mode = 'numeric'),
+                       Nhat = predict(lm.list[[plot.set]]),
+                       Nhat_gam = predict(gam.list[[plot.set]]),
+                       NhatLog = predict(lm.logN.list[[plot.set]]),
+                       NhatLog_gam = predict(gam.logN.list[[plot.set]]))
+p.N <- ggplot(data = tmp.N.df) + 
+  geom_point(aes(x = time, y = N)) + 
+  geom_line(aes(x = time, y = Nhat)) + 
+  geom_line(aes(x = time, y = Nhat_gam))
+
+# p.logN <- ggplot(data = tmp.N.df) + 
+#   geom_point(aes(x = time, y = log(N))) + 
+#   geom_line(aes(x = time, y = NhatLog)) + 
+#   geom_line(aes(x = time, y = NhatLog_gam))
+
+p.N
+# p.logN
+
+```
+
+Let's look at slopes and edfs here:
+
+```{r}
+slopes <- unlist(lapply(lm.list, 
+                 FUN = function(x) summary(x)$coefficients['time', 'Estimate']))
+# log.slopes <- unlist(lapply(lm.logN.list, 
+#                             FUN = function(x) summary(x)$coefficients['time', 'Estimate']))
+
+slopes.df <- data.frame(slope = slopes, log.slope = log.slopes)
+p.slopes <- ggplot(data = slopes.df) + 
+  geom_histogram(aes(x = slope),
+                 bins = 40) + 
+  geom_density(aes(x = slope))
+
+# p.log.slopes <- ggplot(data = slopes.df) + 
+#   geom_histogram(aes(x = log.slope),
+#                  bins = 40) + 
+#   geom_density(aes(x = log.slope))
+
+p.slopes
+# p.log.slopes
+```
+
+Look at the edf of GAM analysis:
+
+```{r}
+edfs <- unlist(lapply(gam.list, FUN = function(x) summary(x)$edf))
+#edfs.logN <- unlist(lapply(gam.logN.list, FUN = function(x) summary(x)$edf))
+
+edf.df <- data.frame(edf = as.numeric(edfs),
+                     edf.logN = as.numeric(edfs.logN))
+p.edf <- ggplot(data = edf.df) + 
+  geom_histogram(aes(x = edf), bins = 40)
+# p.logN.edf <- ggplot(data = edf.df) + 
+#   geom_histogram(aes(x = edf.logN), bins = 40)
+p.edf
+# p.logN.edf
+```
+
+For the non-log scale analysis, ```r dim(filter(edf.df, edf < 1.02))[1]``` of GAM fits that indicated the linear model was the best (edf < 1.02).  For the log scale analysis, ```r dim(filter(edf.df, edf.logN < 1.02))[1]``` edfs were < 1.02. For others, however, curved relationships were better, indicating posibility of decreasing trend in the recent years. Let's look at all GAM functions. 
+
+```{r}
+GAM.predicted <- lapply(gam.list, FUN = predict)
+GAM.predicted.df <- data.frame(do.call(cbind, GAM.predicted))
+GAM.predicted.df$year <- years
+
+# find which ones decreased from first year to the last:
+GAM.predicted.df3 <- filter(GAM.predicted.df, year == 1974 | year == 2016) 
+dN <- GAM.predicted.df3[2,1:1000] - GAM.predicted.df3[1, 1:1000]
+
+GAM.predicted.df2 <- gather(GAM.predicted.df, year, N) 
+colnames(GAM.predicted.df2) <- c("year", "set", "N")
+#GAM.predicted.df2 <- group_by(GAM.predicted.df2, 'set')
+
+p.gam.prediction <- ggplot(GAM.predicted.df2) + 
+  geom_line(aes(x = year, y = N, group = set)) + 
+  labs(x = '', y = '') + 
+  theme(legend.position = 'none') + 
+  theme(axis.title = element_text(size = 12),
+        axis.text = element_text(size = 12),
+        legend.position = c(0.1, 0.6),
+        legend.title.align = 0.5)
+p.gam.prediction
+
+# ggsave(filename = paste0('figures/predicted_abundance.png'),
+#          dpi = 600,
+#          height = 7,
+#          units = 'in',
+#          plot = p.gam.prediction)
+
+```
+
+For the 1000 GAM fits, ```r length(dN[dN<0])``` indicated declining trend. 
+
