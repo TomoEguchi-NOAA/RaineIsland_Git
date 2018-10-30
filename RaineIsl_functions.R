@@ -4,8 +4,8 @@
 
 sysInfo <- Sys.info()
 ifelse(sysInfo[1] == 'Linux',
-       source('~/Documents/R/TomosFunctions.R'),
-       source('~/R/TomosFunctions.R'))
+       source('~/Documents/R/tools/TomosFunctions.R'),
+       source('~/R/tools/TomosFunctions.R'))
 
 library(tidyverse)
 library(lubridate)
