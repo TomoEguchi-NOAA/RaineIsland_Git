@@ -112,8 +112,8 @@ Let's look at slopes and edfs here:
 ```{r}
 slopes <- unlist(lapply(lm.list, 
                  FUN = function(x) summary(x)$coefficients['time', 'Estimate']))
-# log.slopes <- unlist(lapply(lm.logN.list, 
-#                             FUN = function(x) summary(x)$coefficients['time', 'Estimate']))
+log.slopes <- unlist(lapply(lm.logN.list,
+                            FUN = function(x) summary(x)$coefficients['time', 'Estimate']))
 
 slopes.df <- data.frame(slope = slopes, log.slope = log.slopes)
 p.slopes <- ggplot(data = slopes.df) + 
@@ -134,7 +134,7 @@ Look at the edf of GAM analysis:
 
 ```{r}
 edfs <- unlist(lapply(gam.list, FUN = function(x) summary(x)$edf))
-#edfs.logN <- unlist(lapply(gam.logN.list, FUN = function(x) summary(x)$edf))
+edfs.logN <- unlist(lapply(gam.logN.list, FUN = function(x) summary(x)$edf))
 
 edf.df <- data.frame(edf = as.numeric(edfs),
                      edf.logN = as.numeric(edfs.logN))
@@ -152,13 +152,14 @@ For the non-log scale analysis, ```r dim(filter(edf.df, edf < 1.02))[1]``` of GA
 GAM.predicted <- lapply(gam.list, FUN = predict)
 GAM.predicted.df <- data.frame(do.call(cbind, GAM.predicted))
 GAM.predicted.df$year <- years
+GAM.predicted.df2 <- reshape2::melt(GAM.predicted.df, id = "year", value.name = "N")
+GAM.predicted.df2$set <- rep(1:1000, each = 40)
 
 # find which ones decreased from first year to the last:
 GAM.predicted.df3 <- filter(GAM.predicted.df, year == 1974 | year == 2016) 
 dN <- GAM.predicted.df3[2,1:1000] - GAM.predicted.df3[1, 1:1000]
 
-GAM.predicted.df2 <- gather(GAM.predicted.df, year, N) 
-colnames(GAM.predicted.df2) <- c("year", "set", "N")
+#colnames(GAM.predicted.df2) <- c("year", "N")
 #GAM.predicted.df2 <- group_by(GAM.predicted.df2, 'set')
 
 p.gam.prediction <- ggplot(GAM.predicted.df2) + 
