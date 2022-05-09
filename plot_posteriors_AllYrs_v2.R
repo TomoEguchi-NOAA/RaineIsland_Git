@@ -8,7 +8,7 @@ library(ggridges)
 library(tidyverse)
 library(rjags)
 #library(reshape2)
-saveFig <- F
+saveFig <- T
 
 model.v.I <- 'v15'
 model.v.T <- 'v7'  # v8 and v9 did not converge
@@ -126,9 +126,10 @@ colnames(N.df.I) <- c('lowN', 'modeN', 'highN')
 
 df.N.integrated <- select(df.integrated, starts_with('N')) %>%
   change.parameter.name(., params2seasons.N) %>%
-  gather(1974:1984, factor_key = TRUE) 
+  pivot_longer(everything(), names_to = "season", values_to = "sample")
+  #gather("1974":"1984", factor_key = TRUE) 
 
-colnames(df.N.integrated) <- c("season", "sample") 
+#colnames(df.N.integrated) <- c("season", "sample") 
 
 df.N.integrated <- mutate(df.N.integrated, 
                           f.season = as.factor(season))
@@ -441,7 +442,7 @@ Bailey_HG$f.season <- as.factor(Bailey_HG$season)
 p.Bailey <- ggplot(data = Bailey_HG) + 
   labs(x = 'Abundance (Bailey\'s)',
        y = '') +
-  geom_errorbarh(aes(y = f.season, x = Nhat.Baileys,
+  geom_errorbarh(aes(y = f.season, #x = Nhat.Baileys,
                     xmax = Nhat.Baileys + N.SE.Baileys * 2, 
                     xmin = Nhat.Baileys - N.SE.Baileys * 2),
                 size = 1,
