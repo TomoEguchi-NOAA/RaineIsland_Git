@@ -7,7 +7,7 @@ source('RaineIsl_functions.R')
 library(tidyverse)
 #library(ggridges)
 
-saveFig <- F
+saveFig <- T
 
 # input data files 
 petersen.file <- 'data/Petersen_data.csv'
@@ -141,7 +141,7 @@ p.Bailey.TC <- ggplot(TC.Bailey) +
                             green = 129,
                             blue = 189,
                             maxColorValue = 255)) +
-  geom_errorbarh(aes(y = Nhat, x = TC.mean,
+  geom_errorbarh(aes(y = Nhat, #x = TC.mean,
                      xmin = TC.mean - TC.SE,
                      xmax = TC.mean + TC.SE),
                  size = 1.0,
@@ -194,7 +194,7 @@ p.nest.success.TC <- ggplot(data = nest.success.TC.df) +
                  y = mean.nest.suc),
              size = 2.5,shape = 19) + 
   geom_errorbarh(aes(y = mean.nest.suc, 
-                     x = TC.mean,
+                     #x = TC.mean,
                      xmin = TC.mean - TC.SE,
                      xmax = TC.mean + TC.SE),
                  size = 1.0,
@@ -229,7 +229,7 @@ p.nest.success.Bailey <- ggplot(data = nest.success.TC.df) +
                  y = mean.nest.suc),
              size = 2.5,shape = 19) + 
   geom_errorbarh(aes(y = mean.nest.suc, 
-                     x = Nhat,
+                     #x = Nhat,
                      xmin = Nhat - Nhat_SE,
                      xmax = Nhat + Nhat_SE),
                  size = 1.0,
