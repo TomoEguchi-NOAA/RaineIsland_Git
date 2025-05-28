@@ -23,5 +23,5 @@ model{
       m[t, i] ~ dbin(p[t, i], n[t, i])
     }
   }
-
+  
 }

@@ -1,0 +1,33 @@
+model{
+  # simple binomial model for repeated Lincoln-Petersen
+  # abundance estimation
+  
+  # data
+  # M: Total number of painted turtles
+  # m: the number of painted turtles seen at time t
+  # n: the total number of turtles seen at time t
+  
+  # we estimate p. = m/M, which is the binomial p, then
+  # compute N from n ~ BIN(p., N)
+  
+  # priors - N can be a multi-variate distribution
+  
+  # if we think the N is different between methods
+  #for (k in 1:n.methods){
+  #  N[k] ~ dunif(N.min, 50000)
+  #}
+  
+  N ~ dunif(N.min, 50000)
+  
+  for (i in 1:n.survey){
+	p.[i] <- m[i] / M 
+	
+	# likelihood: if we think the N is different between methods
+	#n[i] ~ dbin(p.[i], round(N[idx[i]]))
+	#log.lkhd[i] <- logdensity.bin(n[i], p.[i], round(N[idx[i]]))
+	n[i] ~ dbin(p.[i], round(N))
+	log.lkhd[i] <- logdensity.bin(n[i], p.[i], round(N))
+	    
+  }
+  
+}
